@@ -1,0 +1,8 @@
+.cache/
+.ssh/
+.gnupg/
+.local/share/keyrings/
+*.log
+.env
+.env.*
+node_modules/

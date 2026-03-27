@@ -1,0 +1,279 @@
+{
+  "layer": "top",
+  "position": "top",
+  "mode": "dock",
+  "exclusive": true,
+  "passthrough": false,
+  "gtk-layer-shell": true,
+  "reload_style_on_change": true,
+
+  // Positions
+  "modules-left": [
+    "custom/idle_inhibitor",
+    "hyprland/workspaces", // workspaces
+    "hyprland/window" // window title
+  ],
+
+  "modules-center": [
+  //  "custom/cpu",
+ //   "custom/cpuinfo",
+//    "memory",
+    "clock#time",
+    "clock#date"
+  ],
+
+  "modules-right": [
+    "network", // network speed
+    "tray",
+    "privacy",
+    //"hyprland/language", // language indicator
+    "pulseaudio",
+    "pulseaudio#microphone",
+    "custom/backlight",
+//    "power-profiles-daemon",
+    "custom/power" // power button
+  ],
+
+
+  // Left modules
+  "custom/idle_inhibitor": {
+    "format": "󰣇",
+    "exec": "~/.config/bin/idle-inhibitor.sh",
+    "on-click": "~/.config/bin/idle-inhibitor.sh --toggle",
+    "return-type": "json",
+    "tooltip": true,
+    "interval": 10,
+    "min-length": 2,
+    "max-length": 2
+  },
+
+  "hyprland/workspaces": {
+    "disable-scroll": false,
+    "tooltip": false,
+    "on-scroll-up": "hyprctl dispatch workspace -1",
+    "on-scroll-down": "hyprctl dispatch workspace +1",
+    "sort-by-number": true,
+    "persistent-workspaces": {
+      "*": [ 1, 2, 3 ]
+    }
+  },
+
+  "hyprland/window": {
+    "format": "{}",
+    "tooltip": false,
+    "separate-outputs": true,
+    "icon": true,
+    "icon-size": 14,
+    "rewrite": {
+      // Desktop
+      "": "  Hyprland",
+
+      // Security
+      "Authenticate": "  Authenticate"
+    },
+    "min-length": 3,
+    "max-length": 55
+  },
+
+
+  // Central modules
+  "custom/cpu": {
+    "exec": "~/.config/bin/cpu-usage.sh",
+    "return-type": "json",
+    "on-click": "missioncenter",
+    "tooltip": true,
+    "interval": 5,
+    "min-length": 6,
+    "max-length": 6
+  },
+  "custom/cpuinfo": {
+    "exec": "~/.config/bin/cpu-info.sh",
+    "return-type": "json",
+    "format": "{}",
+    "on-click": "psensor",
+    "tooltip": true,
+    "interval": 5,
+    "min-length": 6,
+    "max-length": 6
+  },
+
+  "memory": {
+    "states": {
+      "c": 90
+    },
+    "format": "󰘚 {percentage}%",
+    "format-c": "󰀪 {percentage}%",
+    "tooltip": true,
+    "tooltip-format": "Memory Used: {used:0.1f} GB / {total:0.1f} GB",
+    "interval": 5,
+    "on-click": "kitty sh -c btop",
+    "min-length": 6,
+    "max-length": 6
+  },
+
+  "clock#time": {
+    "format": "󱑂 {:%I:%M:%p}",
+    "tooltip": true,
+    "on-click": "gnome-clocks",
+    "tooltip-format": "12-hour Format: {:%I:%M %p}",
+    "min-length": 10,
+    "max-length": 10
+  },
+
+  "clock#date": {
+    //"format": "󰨳 {:%m-%d}",
+    "format": "󰨳 {:%d/%m/%Y}",
+    "tooltip-format": "<tt>{calendar}</tt>",
+    "calendar": {
+      "mode": "month",
+      "mode-mon-col": 4,
+      "on-click-right": "mode",
+      "format": {
+        "today": "<span color='#a6e3a1'><b>{}</b></span>"
+      }
+    },
+    "actions": {
+      "on-click-right": "mode",
+      "on-scroll-up": "shift_up",
+      "on-scroll-down": "shift_down"
+    },
+    "on-click": "gnome-calendar",
+    "min-length": 7,
+    "max-length": 12
+  },
+
+
+  // Right modules
+  "network": {
+    "interface": "*0",
+    "interval": 5,
+    "format": " {bandwidthTotalBytes}",
+    "format-alt": " {bandwidthUpBytes}  {bandwidthDownBytes}",
+    "format-disconnected": "",
+    "tooltip-format": "  {ifname} \n {bandwidthUpBytes}  {bandwidthDownBytes}",
+    "tooltip-format-wifi": "󰖩 {essid} ({signalStrength}%) \n {bandwidthUpBytes}  {bandwidthDownBytes}",
+    "tooltip-format-disconnected": "Disconnected",
+    "on-click-right": "portmaster",
+    "max-length": 24
+  },
+
+  "tray": {
+    "icon-size": 13,
+    "rotate": 0,
+    "spacing": 10
+  },
+
+  "privacy": {
+    "icon-spacing": 8,
+    "icon-size": 14,
+    "transition-duration": 250,
+    "modules": [
+      {
+        "type": "screenshare",
+        "tooltip": true,
+        "tooltip-icon-size": 20
+      },
+      {
+        "type": "audio-in",
+        "tooltip": true,
+        "tooltip-icon-size": 20
+      }
+    ],
+    "ignore": [
+      {
+        "type": "audio-in",
+        "name": "cava"
+      }
+    ]
+  },
+
+  "hyprland/language": {
+    "format": "󰇧 {}",
+    "format-en": "EN",
+    "format-ru": "RU",
+    "on-click": "hyprctl switchxkblayout current next",
+    "min-length": 4,
+    "max-length": 4
+  },
+
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "format-muted": "󰝟 {volume}%",
+    "format-icons": {
+      "headphone": "󰋋",
+      "default": [
+        "󰕿",
+        "󰖀",
+        "󰕾"
+      ]
+    },
+    "tooltip": true,
+    "tooltip-format": "{desc} - {volume}%",
+    "on-click": "~/.config/bin/volume-control.sh m",
+    "on-click-right": "pavucontrol",
+    "on-scroll-up": "~/.config/bin/volume-control.sh i",
+    "on-scroll-down": "~/.config/bin/volume-control.sh d",
+    "min-length": 6,
+    "max-length": 6
+  },
+
+  "pulseaudio#microphone": {
+    "format": "{format_source}",
+    "rotate": 0,
+    "format-source": "󰍬",
+    "format-source-muted": "󰍭",
+    "tooltip": true,
+    "tooltip-format": "{source_desc} - {source_volume}%",
+    "on-click": "~/.config/bin/mic-control.sh m",
+    "on-click-right": "easyeffects",
+    "on-scroll-up": "~/.config/bin/mic-control.sh i",
+    "on-scroll-down": "~/.config/bin/mic-control.sh d",
+    "min-length": 2,
+    "max-length": 2
+  },
+
+"custom/backlight": {
+  "exec": "~/.config/bin/brightness-control.sh",
+  "return-type": "json",
+  "format": "{}",
+  "tooltip": true,
+  "interval": 1,
+  "signal": 8,
+  "exec-on-event": false,
+
+  "on-scroll-up": "~/.config/bin/brightness-control.sh -o i && pkill -RTMIN+8 waybar",
+  "on-scroll-down": "~/.config/bin/brightness-control.sh -o d && pkill -RTMIN+8 waybar",
+
+//  "on-click": "~/.config/bin/brightness-slider.sh",
+//  "on-click": "eww open --toggle brightness_popup && ~/.config/bin/brightness-popup-touch.sh",
+"on-click": "eww active-windows | grep -q brightness_popup && eww close brightness_popup || eww open brightness_popup",
+
+  "min-length": 6,
+  "max-length": 6
+},
+
+  "power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip-format": "Power profile: {profile}\nDriver: {driver}",
+    "tooltip": true,
+    "format-icons": {
+      "default": "",
+      "performance": "",
+      "balanced": "",
+      "power-saver": ""
+    },
+    "min-length": 2,
+    "max-length": 2
+  },
+
+
+  "custom/power": {
+    "format": "",
+    "tooltip": false,
+    "on-click": "~/.config/bin/logout-launch.sh",
+    "on-click-right": "~/.config/bin/logout-launch.sh",
+    "interval": 86400,
+    "max-length": 2,
+    "min-length": 2
+  }
+}
