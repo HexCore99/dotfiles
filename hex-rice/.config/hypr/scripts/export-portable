@@ -1,0 +1,29 @@
+#!/bin/sh
+# Make a clean copy for another Arch machine, leaving live state untouched.
+set -eu
+source_dir="$HOME/.config/hypr"
+if [ "$#" -ne 1 ]; then
+    echo 'Usage: export-portable DESTINATION_DIRECTORY' >&2
+    exit 2
+fi
+destination=$(realpath -m -- "$1")
+if [ "$destination" = "$source_dir" ] || [ "${destination#"$source_dir"/}" != "$destination" ]; then
+    echo 'Destination must be outside the live config directory.' >&2
+    exit 2
+fi
+if [ -e "$destination" ]; then
+    echo "Destination already exists: $destination" >&2
+    exit 2
+fi
+mkdir -p -- "$destination"
+tar -C "$source_dir" -cf - \
+    --exclude='./.git' --exclude='./.agents' --exclude='./.codex' --exclude='./.aws' \
+    --exclude='./terminal/fastfetchPNG-images/.git' \
+    --exclude='./terminal/vendor' --exclude='./terminal/tools' \
+    --exclude='./terminal/generated' --exclude='./launcher/bin/fuzzel' \
+    --exclude='./wallpaper/state.json' --exclude='./wallpaper/current' \
+    --exclude='./wallpaper/apply.lock' --exclude='./bar/disabled' \
+    --exclude='__pycache__' --exclude='*.pyc' . | tar -C "$destination" -xf -
+ln -s default.png "$destination/wallpaper/current"
+printf 'Portable copy ready: %s\n' "$destination"
+printf 'On the new Arch machine, copy it to ~/.config/hypr and run: sh ~/.config/hypr/scripts/setup-arch\n'

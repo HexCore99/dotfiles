@@ -1,0 +1,11 @@
+#!/bin/sh
+# Keep Kitty's shell independent of the account login shell.
+export ZDOTDIR="$HOME/.config/hypr/terminal/zsh"
+if command -v zsh >/dev/null 2>&1; then
+    exec zsh "$@"
+fi
+legacy="$HOME/.config/hypr/terminal/vendor/usr/bin/zsh"
+if [ -x "$legacy" ]; then
+    exec "$legacy" "$@"
+fi
+exec /bin/sh "$@"

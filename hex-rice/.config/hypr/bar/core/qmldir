@@ -1,0 +1,8 @@
+# Register the local QML components and shared singleton services.
+singleton Actions 1.0 Actions.qml
+Ipc 1.0 Ipc.qml
+singleton PowerState 1.0 PowerState.qml
+singleton WifiState 1.0 WifiState.qml
+singleton BluetoothState 1.0 BluetoothState.qml
+singleton WallpaperState 1.0 WallpaperState.qml
+singleton SoundState 1.0 SoundState.qml

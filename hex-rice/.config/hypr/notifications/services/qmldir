@@ -1,0 +1,2 @@
+singleton NotificationStore 1.0 NotificationStore.qml
+singleton NotificationTheme 1.0 NotificationTheme.qml

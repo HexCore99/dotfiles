@@ -1,0 +1,25 @@
+#!/bin/sh
+# Regenerate native Zsh integrations after upgrading Starship, zoxide or fzf.
+# Run during setup/update, never on the interactive shell's startup path.
+set -eu
+terminal="$HOME/.config/hypr/terminal"
+zsh_bin=$(command -v zsh || true)
+if [ -z "$zsh_bin" ]; then zsh_bin="$terminal/vendor/usr/bin/zsh"; fi
+if [ ! -x "$zsh_bin" ]; then echo 'Zsh is required to generate shell integrations.' >&2; exit 1; fi
+if [ -x "$terminal/vendor/usr/bin/fzf" ] && ! command -v fzf >/dev/null 2>&1; then
+    PATH="$terminal/vendor/usr/bin:$PATH"
+fi
+export PATH
+mkdir -p "$terminal/generated"
+temporary=$(mktemp -d "$terminal/generated/.init.XXXXXX")
+trap 'rm -rf "$temporary"' EXIT HUP INT TERM
+starship init zsh --print-full-init > "$temporary/starship.zsh"
+zoxide init zsh > "$temporary/zoxide.zsh"
+fzf --zsh > "$temporary/fzf.zsh"
+for integration in starship zoxide fzf; do
+    [ -s "$temporary/$integration.zsh" ]
+    "$zsh_bin" -fn "$temporary/$integration.zsh"
+done
+for integration in starship zoxide fzf; do
+    mv -f "$temporary/$integration.zsh" "$terminal/generated/$integration.zsh"
+done

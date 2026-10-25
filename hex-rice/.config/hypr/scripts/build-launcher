@@ -1,0 +1,59 @@
+#!/bin/sh
+# Rebuild only this desktop's Fuzzel scroll fix; never install system packages.
+# Sources are pinned and checksum-verified. Build-only dependencies stay private.
+set -eu
+config="$HOME/.config/hypr"
+cache="${HYPR_LAUNCHER_BUILD_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/hypr-launcher-build}"
+mkdir -p "$cache"
+for tool in curl tar sha256sum patch meson ninja pkg-config cc install; do
+    command -v "$tool" >/dev/null || { echo "Missing build tool: $tool" >&2; exit 1; }
+done
+
+fetch() {
+    name="$1"; url="$2"; checksum="$3"
+    if ! printf '%s  %s\n' "$checksum" "$cache/$name" | sha256sum --check --status 2>/dev/null; then
+        curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 \
+            "$url" --output "$cache/$name.download"
+        printf '%s  %s\n' "$checksum" "$cache/$name.download" | sha256sum --check --status
+        mv "$cache/$name.download" "$cache/$name"
+    fi
+}
+fetch fuzzel-1.15.0.tar.gz https://codeberg.org/dnkl/fuzzel/archive/1.15.0.tar.gz \
+    95b6c022fc1f1c7ab586d47c1594417cc311bf41ea8f5f8b5641478da7b5cf3b
+fetch tllist-1.1.0.tar.gz https://codeberg.org/dnkl/tllist/archive/1.1.0.tar.gz \
+    0e7b7094a02550dd80b7243bcffc3671550b0f1d8ba625e4dff52517827d5d23
+
+work=$(mktemp -d "$cache/build.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+trap 'exit 1' HUP INT TERM
+tar -xzf "$cache/fuzzel-1.15.0.tar.gz" -C "$work"
+tar -xzf "$cache/tllist-1.1.0.tar.gz" -C "$work/fuzzel/subprojects"
+patch -d "$work/fuzzel" -p1 < "$config/launcher/native/scroll.patch"
+
+# fcft's pkg-config metadata also references these header-only build files.
+mkdir "$work/pkgconfig"
+cat > "$work/pkgconfig/tllist.pc" <<EOF
+Name: tllist
+Description: Private build-only typed linked-list headers
+Version: 1.1.0
+Cflags: -I$work/fuzzel/subprojects/tllist
+EOF
+export PKG_CONFIG_PATH="$work/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+meson setup "$work/build" "$work/fuzzel" --buildtype=release --wrap-mode=nofallback \
+    -Ddocumentation=false -Denable-cairo=enabled -Dsvg-backend=resvg -Dpng-backend=libpng
+ninja -C "$work/build" -j2 fuzzel
+# Compile the small viewport regression suite, discarding unrelated UI functions.
+# pkg-config emits compiler argument words, intentionally expanded here.
+cc -std=c18 -D_GNU_SOURCE -O2 -ffunction-sections -fdata-sections \
+    -I"$work/fuzzel" -I"$work/build" $(pkg-config --cflags fcft pixman-1) \
+    "$config/launcher/native/test-viewport.c" -Wl,--gc-sections \
+    -o "$work/test-viewport"
+"$work/test-viewport"
+"$work/build/fuzzel" --config "$config/launcher/fuzzel.ini" --check-config
+
+# Publish atomically, leaving a working local binary intact if a rebuild fails.
+mkdir -p "$config/launcher/bin"
+install -m755 "$work/build/fuzzel" "$config/launcher/bin/.fuzzel.new"
+if command -v strip >/dev/null; then strip --strip-unneeded "$config/launcher/bin/.fuzzel.new"; fi
+mv "$config/launcher/bin/.fuzzel.new" "$config/launcher/bin/fuzzel"
+printf '%s\n' 'Launcher scroll fix rebuilt. The system Fuzzel is unchanged.'

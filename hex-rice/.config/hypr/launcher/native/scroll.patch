@@ -1,0 +1,353 @@
+--- a/match.c
++++ b/match.c
+@@ -58,6 +58,7 @@
+ 
+     size_t page_count;
+     size_t selected;
++    size_t first_visible; /* Viewport is independent of the hovered selection. */
+     size_t max_matches_per_page;
+     size_t fuzzy_min_length;
+     size_t fuzzy_max_length_discrepancy;
+@@ -87,6 +88,28 @@
+         struct match *old_matches;
+     } workers;
+ };
++
++/* Keep keyboard selection visible without tying the view to fixed pages. */
++static void
++keep_selection_visible(struct matches *matches)
++{
++    const size_t count = matches->match_count;
++    const size_t rows = matches->max_matches_per_page;
++    if (count == 0 || rows == 0) {
++        matches->selected = 0;
++        matches->first_visible = 0;
++        return;
++    }
++    if (matches->selected >= count)
++        matches->selected = count - 1;
++    if (matches->selected < matches->first_visible)
++        matches->first_visible = matches->selected;
++    else if (matches->selected - matches->first_visible >= rows)
++        matches->first_visible = matches->selected - rows + 1;
++    const size_t last_start = count > rows ? count - rows : 0;
++    if (matches->first_visible > last_start)
++        matches->first_visible = last_start;
++}
+ 
+ struct thread_context {
+     struct matches *matches;
+@@ -592,6 +615,7 @@
+ matches_max_matches_per_page_set(struct matches *matches, size_t max_matches)
+ {
+     matches->max_matches_per_page = max_matches;
++    keep_selection_visible(matches);
+ }
+ 
+ size_t
+@@ -613,7 +637,7 @@
+ size_t
+ match_get_idx(const struct matches *matches, size_t idx)
+ {
+-    const size_t page_no = matches_get_page(matches);
++    const size_t page_no UNUSED = matches_get_page(matches);
+     const size_t items_on_page UNUSED = matches_get_count(matches);
+ 
+     LOG_DBG(
+@@ -623,7 +647,7 @@
+         matches->max_matches_per_page, matches->match_count);
+ 
+     assert(idx < items_on_page);
+-    idx += page_no * matches->max_matches_per_page;
++    idx += matches->first_visible;
+ 
+     assert(idx < matches->match_count);
+     return idx;
+@@ -652,19 +676,10 @@
+ size_t
+ matches_get_count(const struct matches *matches)
+ {
+-    const size_t total = matches->match_count;
+-    const size_t page_no = matches_get_page(matches);
+-
+-    if (matches->max_matches_per_page == 0)
++    if (matches->first_visible >= matches->match_count)
+         return 0;
+-
+-    if (total == 0)
+-        return 0;
+-    else if (page_no + 1 >= matches->page_count) {
+-        size_t remainder = total % matches->max_matches_per_page;
+-        return remainder == 0 ? matches->max_matches_per_page : remainder;
+-    } else
+-        return matches->max_matches_per_page;
++    return min(matches->max_matches_per_page,
++               matches->match_count - matches->first_visible);
+ }
+ 
+ size_t
+@@ -677,7 +692,7 @@
+ matches_get_match_index(const struct matches *matches)
+ {
+     return matches->max_matches_per_page != 0
+-        ? matches->selected % matches->max_matches_per_page
++        ? matches->selected - matches->first_visible
+         : 0;
+ }
+ 
+@@ -696,7 +711,7 @@
+                        matches->matches[i].application->title_len,
+                        string, c32len(string)) != NULL)
+         {
+-            matches->selected = i;
++            matches_selected_set(matches, i);
+             free(string);
+             return true;
+         }
+@@ -719,95 +734,88 @@
+ bool
+ matches_selected_first(struct matches *matches)
+ {
+-    if (matches->match_count <= 0 || matches->selected <= 0)
++    if (matches->match_count == 0 || matches->selected == 0)
+         return false;
+-
+-    matches->selected = 0;
+-    return true;
++    return matches_selected_set(matches, 0);
+ }
+ 
+ bool
+ matches_selected_set(struct matches *matches, size_t idx)
+ {
+-    if (matches == NULL || matches->match_count <= 0 || idx >= matches->match_count)
++    if (matches == NULL || idx >= matches->match_count)
+         return false;
+-
+     matches->selected = idx;
++    keep_selection_visible(matches);
+     return true;
+ }
+ 
+ bool
+ matches_selected_last(struct matches *matches)
+ {
+-    if (matches->match_count <= 0 ||
+-        matches->selected >= matches->match_count - 1)
+-    {
++    if (matches->match_count == 0 || matches->selected == matches->match_count - 1)
+         return false;
+-    }
+-
+-    matches->selected = matches->match_count - 1;
+-    return true;
++    return matches_selected_set(matches, matches->match_count - 1);
+ }
+ 
+ bool
+ matches_selected_prev(struct matches *matches, bool wrap)
+ {
+-    if (matches->selected > 0) {
+-        matches->selected--;
+-        return true;
+-    } else if (wrap && matches->match_count > 1) {
+-        matches->selected = matches->match_count - 1;
+-        return true;
+-    }
+-
+-    return false;
++    if (matches->selected > 0)
++        return matches_selected_set(matches, matches->selected - 1);
++    return wrap && matches->match_count > 1
++        ? matches_selected_set(matches, matches->match_count - 1) : false;
+ }
+ 
+ bool
+ matches_selected_next(struct matches *matches, bool wrap)
+ {
+-    if (matches->selected + 1 < matches->match_count) {
+-        matches->selected++;
+-        return true;
+-    } else if (wrap && matches->match_count > 1) {
+-        matches->selected = 0;
+-        return true;
+-    }
+-
+-    return false;
++    if (matches->selected + 1 < matches->match_count)
++        return matches_selected_set(matches, matches->selected + 1);
++    return wrap && matches->match_count > 1
++        ? matches_selected_set(matches, 0) : false;
+ }
+ 
+ bool
+ matches_selected_prev_page(struct matches *matches, bool scrolling)
+ {
+-    const size_t page_no = matches_get_page(matches);
+-    if (page_no > 0) {
+-        assert(matches->selected >= matches->max_matches_per_page);
+-        matches->selected -= matches->max_matches_per_page;
+-        return true;
+-    } else if (!scrolling && matches->selected > 0) {
+-        matches->selected = 0;
+-        return true;
+-    }
+-
+-    return false;
++    if (matches->selected == 0 || matches->max_matches_per_page == 0)
++        return false;
++    if (scrolling && matches->first_visible == 0)
++        return false;
++    const size_t step = matches->max_matches_per_page;
++    return matches_selected_set(matches, matches->selected > step
++                                ? matches->selected - step : 0);
+ }
+ 
+ bool
+ matches_selected_next_page(struct matches *matches, bool scrolling)
+ {
+-    const size_t page_no = matches_get_page(matches);
+-    if (page_no + 1 < matches->page_count) {
+-        matches->selected = min(
+-            matches->selected + matches->max_matches_per_page,
+-            matches->match_count - 1);
+-        return true;
+-    } else if (!scrolling && matches->selected < matches->match_count - 1) {
+-        matches->selected = matches->match_count - 1;
+-        return true;
+-    }
+-
+-    return false;
++    if (matches->match_count == 0 || matches->max_matches_per_page == 0
++        || matches->selected == matches->match_count - 1)
++        return false;
++    if (scrolling && matches->first_visible + matches->max_matches_per_page
++        >= matches->match_count)
++        return false;
++    return matches_selected_set(matches, min(matches->selected
++        + matches->max_matches_per_page, matches->match_count - 1));
++}
++
++/* Pointer scrolling moves the view one row, even over a middle list entry.
++ * Preserve the selected row; the caller can then select the hovered row. */
++bool
++matches_scroll(struct matches *matches, bool down)
++{
++    const size_t rows = matches->max_matches_per_page;
++    if (rows == 0 || matches->match_count <= rows)
++        return false;
++    const size_t last_start = matches->match_count - rows;
++    const size_t first = matches->first_visible;
++    if ((down && first >= last_start) || (!down && first == 0))
++        return false;
++    const size_t selected_row = matches->selected - first;
++    matches->first_visible = down ? first + 1 : first - 1;
++    matches->selected = matches->first_visible + selected_row;
++    return true;
+ }
+ 
+ static int
+@@ -1672,6 +1680,7 @@
+     free(copy);
+ 
+ unlock_and_return:
++    keep_selection_visible(matches);
+     matches_unlock(matches);
+ }
+ 
+--- a/match.h
++++ b/match.h
+@@ -79,3 +79,6 @@
+ 
+ bool matches_selected_prev_page(struct matches *matches, bool scrolling);
+ bool matches_selected_next_page(struct matches *matches, bool scrolling);
++
++/* Pointer-only viewport scrolling; never wraps at the ends. */
++bool matches_scroll(struct matches *matches, bool down);
+--- a/wayland.c
++++ b/wayland.c
+@@ -1286,6 +1286,7 @@
+ 
+     if (seat->pointer.discrete_used) {
+         seat->pointer.discrete_used = false;
++        seat->pointer.accumulated_scroll = 0.;
+         return;
+     }
+ 
+@@ -1297,15 +1298,17 @@
+     while (fabs(seat->pointer.accumulated_scroll) > threshold) {
+         if (seat->pointer.accumulated_scroll > 0.) {
+             seat->pointer.accumulated_scroll -= threshold;
+-            refresh = matches_selected_next(wayl->matches, true);
++            refresh |= matches_scroll(wayl->matches, true);
+         } else {
+             seat->pointer.accumulated_scroll += threshold;
+-            refresh = matches_selected_prev(wayl->matches, true);
+-        }
+-    }
+-
+-    if (refresh)
++            refresh |= matches_scroll(wayl->matches, false);
++        }
++    }
++
++    if (refresh) {
+         select_hovered_match(seat, true);
++        wayl_refresh(wayl);
++    }
+ }
+ 
+ static void
+@@ -1318,6 +1321,9 @@
+ wl_pointer_axis_stop(void *data, struct wl_pointer *wl_pointer,
+                      uint32_t time, uint32_t axis)
+ {
++    struct seat *seat = data;
++    if (axis == WL_POINTER_AXIS_VERTICAL_SCROLL)
++        seat->pointer.accumulated_scroll = 0.;
+ }
+ 
+ static void
+@@ -1338,14 +1344,16 @@
+     bool refresh = false;
+     if (discrete > 0) {
+         for (int i = 0; i < discrete; i++)
+-            refresh = matches_selected_next(wayl->matches, true);
++            refresh |= matches_scroll(wayl->matches, true);
+     } else {
+         for (int i = 0; i < -discrete; i++)
+-            refresh = matches_selected_prev(wayl->matches, true);
+-    }
+-
+-    if (refresh)
++            refresh |= matches_scroll(wayl->matches, false);
++    }
++
++    if (refresh) {
+         select_hovered_match(seat, true);
++        wayl_refresh(wayl);
++    }
+ }
+ 
+ static const struct wl_pointer_listener pointer_listener = {
+--- a/meson.build
++++ b/meson.build
+@@ -274,7 +274,9 @@
+   install_dir: join_paths(get_option('datadir'), 'doc', 'fuzzel'))
+ 
+ subdir('completions')
+-subdir('doc')
++if get_option('documentation')
++  subdir('doc')
++endif
+ 
+ summary(
+   {
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -3,3 +3,5 @@
+ option('svg-backend', type: 'combo', choices: ['none', 'librsvg', 'nanosvg', 'resvg'], value: 'nanosvg', description: 'enables support for SVG icons (librsvg: also requires cairo, nanosvg: bundled, resvg: C API)')
+ option('system-nanosvg', type: 'feature', value: 'disabled',
+        description: 'use system\'s nanosvg instead of the bundled version')
++
++option('documentation', type: 'boolean', value: true, description: 'Build manual pages')

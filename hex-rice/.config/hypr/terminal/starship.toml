@@ -1,0 +1,55 @@
+# Use ANSI colors rather than fixed RGB: pywal can recolor the prompt live.
+# A quiet two-line prompt, with context only when it is relevant.
+add_newline = true
+command_timeout = 800
+format = """
+$directory$git_branch$git_status$python$nodejs$rust$cmd_duration$jobs$line_break$character"""
+right_format = ""
+
+[directory]
+style = "bold blue"
+format = "[$path]($style)[$read_only]($read_only_style) "
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " "
+
+[git_branch]
+symbol = " "
+style = "magenta"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "yellow"
+format = "([$all_status$ahead_behind]($style) )"
+
+[character]
+success_symbol = "[❯](bold cyan)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold green)"
+
+[cmd_duration]
+min_time = 2000
+style = "bright-black"
+format = "[· $duration]($style) "
+
+[jobs]
+symbol = "● "
+style = "yellow"
+
+[python]
+symbol = " "
+style = "yellow"
+format = "[$symbol$virtualenv]($style) "
+detect_extensions = []
+detect_files = []
+detect_folders = []
+
+[nodejs]
+symbol = " "
+style = "green"
+format = "[$symbol$version]($style) "
+
+[rust]
+symbol = " "
+style = "red"
+format = "[$symbol$version]($style) "

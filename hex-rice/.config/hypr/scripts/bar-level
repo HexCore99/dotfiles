@@ -1,0 +1,13 @@
+#!/bin/sh
+# Hardware shortcuts work independently of Quickshell. PipeWire changes update
+# the volume module and the passive animated volume indicator automatically.
+set -eu
+case "${1:-}:${2:-}" in
+    volume:up) wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+    volume:down) wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+    volume:mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+    microphone:mute) wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
+    brightness:up) brightnessctl -c backlight -e4 -n2 set 5%+ ;;
+    brightness:down) brightnessctl -c backlight -e4 -n2 set 5%- ;;
+    *) echo 'Usage: bar-level volume up|down|mute; microphone mute; brightness up|down' >&2; exit 2 ;;
+esac

@@ -1,0 +1,25 @@
+#!/bin/sh
+# Shared by the Super shortcuts and the bar; one persistent Quickshell instance.
+set -eu
+config="$HOME/.config/hypr/launcher"
+case "${1:-}" in
+    --search) action=search; query="${2:-}" ;;
+    --close) action=close ;;
+    --status) exec quickshell -p "$config" ipc call launcher status ;;
+    "") action=toggle ;;
+    *) echo 'Usage: launcher [--search TEXT | --close | --status]' >&2; exit 2 ;;
+esac
+call_launcher() {
+    if [ "$action" = search ]; then quickshell -p "$config" ipc call launcher search "$query";
+    else quickshell -p "$config" ipc call launcher "$action"; fi
+}
+if call_launcher >/dev/null 2>&1; then exit 0; fi
+quickshell -p "$config" --no-duplicate --daemonize --no-color
+attempt=0
+while [ "$attempt" -lt 30 ]; do
+    if call_launcher >/dev/null 2>&1; then exit 0; fi
+    attempt=$((attempt + 1))
+    sleep 0.1
+done
+echo 'Launcher did not start; inspect quickshell logs.' >&2
+exit 1

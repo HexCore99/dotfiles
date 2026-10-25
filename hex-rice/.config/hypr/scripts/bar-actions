@@ -1,0 +1,3 @@
+#!/bin/sh
+# Keep application/menu logic out of the visual bar modules.
+exec python "$HOME/.config/hypr/bar/core/actions.py" "$@"

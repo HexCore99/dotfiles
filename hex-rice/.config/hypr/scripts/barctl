@@ -1,0 +1,24 @@
+#!/bin/sh
+# Small command interface for diagnostics and restarting the bar.
+set -eu
+config="$HOME/.config/hypr"
+case "${1:-status}" in
+    status) exec quickshell -p "$config/bar" ipc call bar status ;;
+    sound) exec quickshell -p "$config/bar" ipc call bar soundMenu ;;
+    sound-status) exec quickshell -p "$config/bar" ipc call bar soundStatus ;;
+    power) exec quickshell -p "$config/bar" ipc call bar powerMenu ;;
+    wallpaper) exec quickshell -p "$config/bar" ipc call bar wallpaperMenu ;;
+    wallpaper-status) exec quickshell -p "$config/bar" ipc call bar wallpaperStatus ;;
+    # Independent shell: these work even when the bar is restarting.
+    notifications) exec quickshell -p "$config/notification-shell.qml" ipc call notifications toggle ;;
+    calendar) exec quickshell -p "$config/notification-shell.qml" ipc call notifications calendar ;;
+    restart)
+        # Remove persistent rollback, stop only this config, then wait until its
+        # supervisor releases the lock before asking Hyprland to start it again.
+        rm -f "$config/bar/disabled"
+        quickshell -p "$config/bar" kill >/dev/null 2>&1 || true
+        flock -w 5 "${XDG_RUNTIME_DIR:?}/hypr-minimal/bar.lock" true || exit 1
+        exec hyprctl dispatch "hl.dsp.exec_cmd('sh ~/.config/hypr/scripts/start-desktop.sh')"
+        ;;
+    *) echo 'Usage: barctl status|restart|notifications|calendar|sound|sound-status|power|wallpaper|wallpaper-status' >&2; exit 2 ;;
+esac

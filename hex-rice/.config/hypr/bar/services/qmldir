@@ -1,0 +1,11 @@
+# Register the local QML components and shared singleton services.
+singleton HyprlandService 1.0 HyprlandService.qml
+singleton BatteryService 1.0 BatteryService.qml
+singleton NetworkService 1.0 NetworkService.qml
+singleton SessionService 1.0 SessionService.qml
+singleton AudioService 1.0 AudioService.qml
+singleton BluetoothService 1.0 BluetoothService.qml
+singleton SystemService 1.0 SystemService.qml
+singleton BrightnessService 1.0 BrightnessService.qml
+singleton WallpaperService 1.0 WallpaperService.qml
+singleton SoundService 1.0 SoundService.qml

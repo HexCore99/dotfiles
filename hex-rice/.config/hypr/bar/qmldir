@@ -1,0 +1,3 @@
+# Register the local QML components and shared singleton services.
+singleton Settings 1.0 Settings.qml
+Bar 1.0 Bar.qml

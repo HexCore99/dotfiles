@@ -1,0 +1,73 @@
+#!/bin/sh
+# Run as the desktop user after copying this directory to ~/.config/hypr.
+set -eu
+config="$HOME/.config/hypr"
+if [ "$(realpath -- "$(dirname -- "$0")/..")" != "$(realpath -- "$config")" ]; then
+    echo 'Place this config at ~/.config/hypr before running setup.' >&2
+    exit 2
+fi
+if [ ! -f /etc/arch-release ]; then
+    echo 'This setup script targets Arch Linux.' >&2
+    exit 2
+fi
+if [ "$(id -u)" -eq 0 ]; then
+    echo 'Run this as your desktop user, not as root.' >&2
+    exit 2
+fi
+
+# Every command used by startup, shortcuts and the desktop shell is installed
+# from Arch packages. The browser defaults to Firefox when Zen is unavailable.
+sudo pacman -Syu --needed \
+    hyprland hypridle hyprlock hyprpaper quickshell waybar \
+    kitty nautilus firefox foot btop upower pavucontrol \
+    fuzzel cliphist wl-clipboard grim slurp playerctl brightnessctl \
+    networkmanager bluez bluez-utils pipewire pipewire-pulse wireplumber \
+    polkit-gnome gnome-keyring libnotify \
+    python python-pillow python-gobject python-virtualenv \
+    zsh zsh-autosuggestions zsh-syntax-highlighting fzf starship zoxide \
+    fastfetch eza bat jq ttf-jetbrains-mono-nerd
+
+# Kitty is configured separately from Hyprland. Add one relative include
+# without erasing settings the target user already has.
+mkdir -p "$HOME/.config/kitty" "$HOME/.config/fastfetch/images" "$HOME/Pictures/Wallpapers"
+kitty_config="$HOME/.config/kitty/kitty.conf"
+touch "$kitty_config"
+if ! grep -Fqx 'include ../hypr/terminal/kitty.conf' "$kitty_config"; then
+    printf '\ninclude ../hypr/terminal/kitty.conf\n' >> "$kitty_config"
+fi
+for image in "$config"/terminal/fastfetchPNG-images/*.[Pp][Nn][Gg]; do
+    [ -f "$image" ] || continue
+    cp -n -- "$image" "$HOME/.config/fastfetch/images/"
+done
+
+# These are generated on the target system. Never reuse a copied Python venv
+# or Zsh integration output tied to a previous machine's installed versions.
+virtualenv --clear "$config/terminal/tools"
+"$config/terminal/tools/bin/python" -m pip install -r "$config/terminal/requirements.txt"
+sh "$config/scripts/update-terminal-shell"
+
+# A copied personal wallpaper selection may refer to a file from the old PC.
+# Keep it only when the actual image exists here; the new monitor is resolved at
+# restore time. The lock screen works with its solid background until then.
+python3 - "$config/wallpaper/state.json" "$config/wallpaper/current" <<'PY'
+import json
+from pathlib import Path
+import sys
+state, current = map(Path, sys.argv[1:])
+try:
+    source = Path(json.loads(state.read_text()).get("path", ""))
+    valid = source.is_file()
+except (OSError, ValueError, TypeError):
+    valid = False
+if not valid:
+    state.unlink(missing_ok=True)
+    current.unlink(missing_ok=True)
+    current.symlink_to("default.png")
+else:
+    current.unlink(missing_ok=True)
+    current.symlink_to(source)
+PY
+
+sudo systemctl enable --now NetworkManager.service bluetooth.service
+Hyprland --verify-config --config "$config/hyprland.lua"
+printf '\nSetup complete. Log into Hyprland and choose a wallpaper with Super+Shift+W.\n'
